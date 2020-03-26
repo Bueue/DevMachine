@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo " ---> installing application from $1"
+for installer in `ls $1`
+do
+    echo " ---> installing $installer"
+    $1/$installer
+done

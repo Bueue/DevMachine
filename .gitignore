@@ -1,0 +1,4 @@
+configs/vpnserver.conf
+configs/daemon.json
+configs/tnsnames.ora
+Dockerfile

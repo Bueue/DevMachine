@@ -1,0 +1,75 @@
+FROM ubuntu:18.04
+LABEL maintainer="Nicholas Ricci <nicholas.ricci.92@gmail.com>"
+
+ENV UNAME developer
+
+COPY ./configs/apt-list.conf /etc/
+
+# update repositories
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+    $(cat /etc/apt-list.conf)
+
+# add docker repository
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - && \
+    echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" >>/etc/apt/sources.list.d/docker-repository.list
+
+# install docker
+RUN apt-get update && apt-get --no-install-recommends -y \
+    install docker-ce docker-ce-cli containerd.io && \
+    rm -rf /var/lib/apt/lists/*
+COPY ./configs/daemon.json /etc/docker/daemon.json
+
+# install chrome
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    dpkg -i google-chrome-stable_current_amd64.deb && \
+    rm -fr google-chrome-stable_current_amd64.deb
+
+# configure developer user
+RUN export UNAME=$UNAME UID=1000 GID=1000 && \
+    mkdir -p "/home/${UNAME}" && \
+    echo "${UNAME}:x:${UID}:${GID}:${UNAME},,,:/home/${UNAME}:/bin/bash" >> /etc/passwd && \
+    echo "${UNAME}:x:${UID}:" >> /etc/group && \
+    echo "${UNAME} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${UNAME} && \
+    chmod 0440 /etc/sudoers.d/${UNAME} && \
+    chown ${UID}:${GID} -R /home/${UNAME} && \
+    gpasswd -a ${UNAME} audio
+
+# install oc and kubectl
+RUN OC_TEMP_DIR=/tmp/oc && \
+    wget https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-server-v3.11.0-0cbc58b-linux-64bit.tar.gz -P $OC_TEMP_DIR && \
+    tar -zxvf "${OC_TEMP_DIR}/openshift-origin-server-v3.11.0-0cbc58b-linux-64bit.tar.gz" -C $OC_TEMP_DIR && \
+    mv "${OC_TEMP_DIR}/openshift-origin-server-v3.11.0-0cbc58b-linux-64bit/oc" "${OC_TEMP_DIR}/openshift-origin-server-v3.11.0-0cbc58b-linux-64bit/kubectl" /usr/local/bin/ && \
+    chown ${UNAME}:${UNAME} /usr/local/bin/oc /usr/local/bin/kubectl && \
+    rm -fr $OC_TEMP_DIR
+
+# docker configuration for non-root users
+RUN usermod -aG docker $UNAME
+
+# configure pulseaudio
+COPY ./configs/pulseaudio.client.conf /etc/pulse/client.conf
+
+# sqldeveloper
+COPY ./apps/sqldeveloper.zip /tmp/
+
+# configure scripts folder
+COPY scripts/apps-installers /usr/local/bin/apps-installers
+RUN chown -R $UNAME:$UNAME /usr/local/bin/*
+
+# install applications
+###dockerparts###
+
+# copy bootstrap script and shortcuts
+COPY scripts/bootstrap.sh /usr/local/bin
+COPY shortcuts /usr/local/bin
+RUN chown -R $UNAME:$UNAME /usr/local/bin/*
+
+# set developer as user
+USER ${UNAME}
+
+ENV HOME /home/developer
+WORKDIR ${HOME}
+
+# useful to have colofrul bash
+ENV TERM xterm-256color
+
+CMD [ "/usr/local/bin/bootstrap.sh" ]
