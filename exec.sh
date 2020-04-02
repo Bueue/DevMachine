@@ -2,7 +2,7 @@
 
 PARAMS="$@"
 if [[ $# -eq 0 ]]; then
-    PARAMS="/bin/bash"
+    PARAMS="/bin/zsh"
 fi
 
 docker exec -itu developer dev-machine $PARAMS

@@ -9,6 +9,13 @@ COPY ./configs/apt-list.conf /etc/
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
     $(cat /etc/apt-list.conf)
 
+COPY ./configs/locale.conf /etc/
+
+# set locales
+ENV LANG=it_IT.UTF-8
+ENV LANGUAGE=it_IT
+RUN locale-gen it_IT.UTF-8
+
 # add docker repository
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - && \
     echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" >>/etc/apt/sources.list.d/docker-repository.list
@@ -45,15 +52,14 @@ RUN OC_TEMP_DIR=/tmp/oc && \
 # docker configuration for non-root users
 RUN usermod -aG docker $UNAME
 
+# set zsh as default shell
+RUN chsh -s $(which zsh)
+
 # configure pulseaudio
 COPY ./configs/pulseaudio.client.conf /etc/pulse/client.conf
 
 # sqldeveloper
 COPY ./apps/sqldeveloper.zip /tmp/
-
-# configure scripts folder
-COPY scripts/apps-installers /usr/local/bin/apps-installers
-RUN chown -R $UNAME:$UNAME /usr/local/bin/*
 
 # install applications
 ###dockerparts###
@@ -65,6 +71,9 @@ RUN chown -R $UNAME:$UNAME /usr/local/bin/*
 
 # set developer as user
 USER ${UNAME}
+
+# copy .zshrc
+COPY configs/.zshrc /home/developer/.zshrc
 
 ENV HOME /home/developer
 WORKDIR ${HOME}
